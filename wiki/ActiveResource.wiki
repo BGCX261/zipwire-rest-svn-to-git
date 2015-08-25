@@ -1,0 +1,15 @@
+About ActiveResource
+
+= ActiveResource =
+
+Within RubyOnRails, ActiveResource is an approach to providing an Object Oriented abstraction to REST services. As part of Rails it allows you to manipulate REST resources as Ruby objects.
+
+Java is not Ruby. As such our Zipwire implementation of the ActiveResource pattern is different. For example, in Java we cannot get away with pure duck typing so we approximate this using simple java interfaces.
+
+For more information on Rail's implementation of ActiveResource have a look at:
+
+* http://www.therailsway.com/2007/9/3/using-activeresource-to-consume-web-services
+
+* http://ryandaigle.com/assets/2007/3/14/REST_ARes.pdf
+
+* http://api.rubyonrails.org/classes/ActiveResource/Base.html

@@ -1,0 +1,198 @@
+#summary We create a REST client for 37Signals Highrise Application using zipwire-rest
+
+= Highrise Walkthrough =
+
+A quick example of using zipwire-rest to build a Rest Client for 37Signals Highrise Application, demonstrating GET, POST, PUT and Delete.
+
+Highrise (http://www.highrisehq.com/) is a simple Contact Manager tending towards a lightweight CRM system.
+
+----
+== Getting Started == 
+----
+
+First we need a Highrise account. If you don't already have one you can get one for free at http://www.highrisehq.com/signup. 
+This will give us a host (e.g. myhost.highrisehq.com), a username and a password.
+
+We also need keep the Highrise REST API (http://developer.37signals.com/highrise/) close to hand.
+
+From there we can get started. Lets write a Junit integration test (I would keep this in a separate source folder from the fast running unit tests).
+
+{{{
+public class TestHighrise extends TestCase {
+  Highrise highrise = new Highrise(host, username, password);
+}
+}}}
+
+(do not include the 'http://' part in the host string)
+
+and start our Highrise class
+
+{{{
+public class Highrise extends ApacheRestConnection {
+  static XmlNamingRule xmlNamingRule = new XmlNamingRule(){
+    public String transform(String method) {
+      return new CamelCase(method).separateWith("-").toLowerCase();
+    }
+  };
+  public Highrise(String host, String username, String password) {
+    super(host, username, password, xmlNamingRule);
+  }
+}
+
+}}}
+
+----
+== GET a list of people ==
+----
+
+Highrise is all about the people we know. Lets start with getting a list of everybody our Highrise account knows about. Adding a test method to TestHighrise
+{{{
+public class TestHighrise extends TestCase {
+  Highrise highrise = new Highrise("zipwire.highrisehq.com", "craig", "craig");
+  public void testGetPeople(){
+    List<Person> people = highrise.getPeople();
+    assertEquals(5, people.size());
+  }
+}
+}}}
+
+To get this working we need an interface Person...
+{{{
+public interface Person {}
+}}}
+and a getPeople method in our Highrise class....
+{{{
+  public List<Person> getPeople() {
+    return get("people.xml").asList(Person.class, "person");
+  }
+}}}
+
+Green Bar! Our REST client now works (although doesn't do very much). Now lets get an individual person..
+
+----
+== GET a single person ==
+----
+
+{{{
+  public void testGetPerson(){
+    Person joe = highrise.getPerson("13208599");
+    assertEquals("13208599", joe.getId());
+    assertEquals("joe", joe.getFirstName());
+    assertEquals("smith", joe.getLastName());
+  }
+}}}
+
+So we need to update our interface.
+{{{
+public interface Person {
+  String getId(); String getFirstName(); String getLastName();
+}
+}}}
+and to add getPerson to our Highrise class...
+{{{
+  public Person getPerson(String id) {
+    return get("people/" + id + ".xml").as(Person.class);
+  }
+}}}
+
+Green bar. So thats the easy bit (we'll look at ComplexData separately). What about creating a person, updating a person and deleting that person...
+
+----
+== POST a new person ==
+----
+
+How do we want the person to work (You may want more parameters in real life)...
+{{{
+  public void testPostPerson(){
+    String postData = 
+      "<person>" +
+      "<first-name>Barret</first-name>" + 
+      "<last-name>Cunningham</last-name>" +
+      "</person>";
+    Person barret = highrise.postPerson(postData);
+    assertEquals("Barret", barret.getFirstName());
+    assertEquals("Cunningham", barret.getLastName());
+    personId = barret.getId();
+  }
+}}}
+
+No changes to the interface, so just add the Highrise method...
+{{{
+  public Person postPerson(String postData) {
+    return post("people.xml", postData).as(Person.class);
+  }
+}}}
+
+I'm sure we can come up with a better implementation but it gets our point across. 
+
+_Why not wrap the XML post data?_
+Depending on how old the REST implementation, the data structure can seem pretty random. Check out the 37Signals Basecamp API (http://developer.37signals.com/basecamp/) for examples! Building strings is easy, straightforward and very flexible.
+
+So we've created this Person but now have to manually delete it from our account. Lets fix that.
+
+----
+== DELETE a person ==
+----
+
+If we have created a person in our tests we want to delete them. We can do this by adding a tearDown method that checks for a created person:
+{{{
+  public void tearDown(){
+    if (personId != null)
+      assertEquals(200, highrise.deletePerson(personId));
+  }
+}}}
+We need to change our PostPerson test to assign the id from our created person:
+{{{
+  public void testPostPerson(){
+    ...
+    personId = barret.getId();
+  }
+}}}
+And need to add a field to our Test class
+{{{
+public class TestHighrise extends TestCase {
+  ...
+  String personId = null;
+  ...
+}}}
+And finally to implement the deletePerson message..
+{{{
+public int deletePerson(String personId) {
+  return delete("people/" + personId + ".xml").getStatus();
+}
+}}}
+
+Green Bar! We can now run our tests cleanly.
+
+----
+== PUT changes to an existing person ==
+----
+
+The last bit is to change and existing resource. Our test is more of the same...
+{{{
+  public void testPutPerson(){
+    String postData = 
+      "<person>" +
+      "<first-name>Barret</first-name>" + 
+      "<last-name>Cunningham</last-name>" +
+      "</person>";
+    Person barret = highrise.postPerson(postData);
+    String putData = 
+      "<person>" + 
+      "<title>CEO</title>" + 
+      "</person>";
+    personId = barret.getId();
+    assertEquals(200, highrise.putPerson(personId, putData));
+    assertEquals("CEO", highrise.getPerson(personId).getTitle());
+  }
+}}}
+and so is our implemented method...
+{{{
+  public int putPerson(String personId, String putData) {
+    return put("people/" + personId + ".xml", putData).getStatus();
+  }
+}}}
+
+That's it. Other Highrise resources we need are just managed the same way.
+
+Thanks for reading. You can download the classes from this example (TestHighrise, Highrise, and Project) from the Download area at http://code.google.com/p/zipwire-rest/downloads/list.
